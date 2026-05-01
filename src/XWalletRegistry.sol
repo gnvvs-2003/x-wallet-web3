@@ -23,7 +23,7 @@ contract XWalletRegistry is Ownable, ReentrancyGuard {
 
     // STATE VARIABLES //
 
-    /// @dev The backendSigner address that is authorized to approve links between x and wallet
+    /// @dev The backendSigner address that is authorized to approve links between x and wallet This will be hold by backend
     address public backendSigner;
     /// @dev Mapping between wallet and x username
     mapping(address => string) public walletToUsername;
@@ -132,6 +132,55 @@ contract XWalletRegistry is Ownable, ReentrancyGuard {
         delete isVerified[msg.sender];
         delete verifedAt[msg.sender];
         emit UsernameUnlinked(msg.sender, username, block.timestamp);
+    }
+
+    /**
+     * @notice Gets the wallet address linked to an X username
+     * @param username The X username to look up
+     * @return wallet The wallet address, or address(0) if not linked
+     */
+    function getWalletByUsername(string calldata username) external view returns (address wallet) {
+        return usernameToWallet[_toLower(username)];
+    }
+
+    /**
+     * @notice Gets the X username linked to a wallet address
+     * @param wallet The wallet address to look up
+     * @return username The X username, or empty string if not linked
+     */
+    function getUsernameByWallet(address wallet) external view returns (string memory username) {
+        return walletToUsername[wallet];
+    }
+
+    /**
+     * @dev Checks if the wallet is verified
+     * @param wallet The wallet address
+     * @return True if the wallet is verified, false otherwise
+     */
+    function checkVerified(address wallet) external view returns (bool) {
+        return isVerified[wallet];
+    }
+
+    /**
+     * @dev Builds the message hash to be signed by backend server
+     * @param wallet The wallet address
+     * @param username The X username
+     * @param xUserId The X user ID
+     * @param nonce A nonce used to prevent signature replay attacks
+     * @param expiry The expiry time of the link
+     * @return The message hash to be signed by backend server
+     */
+
+    function buildMessageHash(
+        address wallet,
+        string calldata username,
+        string calldata xUserId,
+        bytes32 nonce,
+        uint256 expiry
+    ) external pure returns (bytes32) {
+        return keccak256(
+            abi.encodePacked("LINK_X_WALLET", wallet, ":", username, ":", xUserId, ":", nonce, ":", expiry)
+        );
     }
 
     // INTERNAL FUNCTIONS - UTILS //
