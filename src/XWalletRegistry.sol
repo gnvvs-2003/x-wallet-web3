@@ -36,6 +36,12 @@ contract XWalletRegistry is Ownable, ReentrancyGuard {
     /// @notice using nonce
     mapping(bytes32 => bool) public usedNonces;
 
+    // EVENTS //
+
+    event UsernameLinked(address indexed wallet, string username, uint256 timestamp);
+    event UsernameUnlinked(address indexed wallet, string username, uint256 timestamp);
+    event BackendSignerUpdated(address oldSigner, address newSigner);
+
     // CONSTRUCTOR //
 
     /**
@@ -47,6 +53,7 @@ contract XWalletRegistry is Ownable, ReentrancyGuard {
     }
 
     // MAIN FUNCTIONS //
+
     /**
      * @notice Links an X username to a wallet address
      * @dev The caller provides a signature from the backend server.
@@ -56,7 +63,7 @@ contract XWalletRegistry is Ownable, ReentrancyGuard {
      * @param nonce A nonce used to prevent signature replay attacks
      * @param expiry The expiry time of the link
      * @param backendSig The backend's ECDSA signature of the link params
-     * @custom:Working
+     * @custom:working
      * #1. User log in with X via OAuth
      * #2. Backend verifies X identity => creates a signed message
      * #3. This function is called by the frontend with backend signature
@@ -73,8 +80,88 @@ contract XWalletRegistry is Ownable, ReentrancyGuard {
         if (bytes(xUserId).length == 0) revert XWalletRegistry__EmptyUserId();
         if (block.timestamp > expiry) revert XWalletRegistry__LinkExpired();
         if (usedNonces[nonce]) revert XWalletRegistry__NonceUsed();
+        /// @dev check existing links
+        address existingWalletForUserName = usernameToWallet[_toLower(username)];
+        /// @dev If already linked revert for new link creation
+        if (existingWalletForUserName != address(0) && existingWalletForUserName != msg.sender) {
+            revert XWalletRegistry__UsernameAlreadyLinked(username, existingWalletForUserName);
+        }
+        /// @dev If already linked revert for new link creation
+        string memory existingUsernameForWallet = walletToUsername[msg.sender];
+        if (bytes(existingUsernameForWallet).length > 0) {
+            revert XWalletRegistry__WalletAlreadyLinked(msg.sender, existingUsernameForWallet);
+        }
+        /// @dev Message hash reconstruct
+        bytes32 messageHash = keccak256(
+            abi.encodePacked(
+                "LINK_X_WALLET",
+                msg.sender, // wallet
+                ":",
+                username, // x username
+                ":",
+                xUserId, // x user id
+                ":",
+                nonce, // nonce
+                ":",
+                expiry // expiry
+            )
+        );
+        // Ethereum signature standard
+        bytes32 ethSignedHash = messageHash.toEthSignedMessageHash();
+        /// @dev Recovering signer from the signature
+        address recoveredSigner = ethSignedHash.recover(backendSig);
+        /// @dev verifying signature
+        if (recoveredSigner != backendSigner) revert XWalletRegistry__InvalidSignature();
+        /// @notice Valid Signature
+        /// @dev state updates => Establish link between username and wallet address
+        string memory lowerUsername = _toLower(username);
+        usedNonces[nonce] = true;
+        usernameToWallet[lowerUsername] = msg.sender;
+        walletToUsername[msg.sender] = lowerUsername;
+        isVerified[msg.sender] = true;
+        verifedAt[msg.sender] = block.timestamp;
+        emit UsernameLinked(msg.sender, lowerUsername, block.timestamp);
+    }
+
+    function unlinkUsername() external nonReentrant {
+        string memory username = walletToUsername[msg.sender];
+        if (bytes(username).length == 0) revert XWalletRegistry__UserNotLinked();
+        // Remove connection between x and wallet
+        delete usernameToWallet[username];
+        delete walletToUsername[msg.sender];
+        delete isVerified[msg.sender];
+        delete verifedAt[msg.sender];
+        emit UsernameUnlinked(msg.sender, username, block.timestamp);
+    }
+
+    // INTERNAL FUNCTIONS - UTILS //
+    /**
+     * @notice Converts a string to lowercase for consistent storage
+     * @dev Only handles ASCII characters (sufficient for X usernames)
+     * @param str The string to convert
+     */
+    function _toLower(string memory str) internal pure returns (string memory) {
+        bytes memory bStr = bytes(str);
+        bytes memory bLower = new bytes(bStr.length);
+        for (uint256 i = 0; i < bStr.length; i++) {
+            // Uppercase A-Z: 0x41 to 0x5A → convert to lowercase
+            if (bStr[i] >= 0x41 && bStr[i] <= 0x5A) {
+                bLower[i] = bytes1(uint8(bStr[i]) + 32);
+            } else {
+                bLower[i] = bStr[i];
+            }
+        }
+        return string(bLower);
     }
 
     // ERRORS //
     error XWalletRegistry__NullAddress();
+    error XWalletRegistry__UserNotLinked();
+    error XWalletRegistry__EmptyUsername();
+    error XWalletRegistry__EmptyUserId();
+    error XWalletRegistry__LinkExpired();
+    error XWalletRegistry__NonceUsed();
+    error XWalletRegistry__InvalidSignature();
+    error XWalletRegistry__UsernameAlreadyLinked(string username, address wallet);
+    error XWalletRegistry__WalletAlreadyLinked(address wallet, string username);
 }
