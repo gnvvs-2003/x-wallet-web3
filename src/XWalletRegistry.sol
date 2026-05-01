@@ -46,6 +46,35 @@ contract XWalletRegistry is Ownable, ReentrancyGuard {
         backendSigner = _backendSigner;
     }
 
+    // MAIN FUNCTIONS //
+    /**
+     * @notice Links an X username to a wallet address
+     * @dev The caller provides a signature from the backend server.
+     *      The signature proves the backend verified the X OAuth session.
+     * @param username The X username to link
+     * @param xUserId The X user ID to link
+     * @param nonce A nonce used to prevent signature replay attacks
+     * @param expiry The expiry time of the link
+     * @param backendSig The backend's ECDSA signature of the link params
+     * @custom:Working
+     * #1. User log in with X via OAuth
+     * #2. Backend verifies X identity => creates a signed message
+     * #3. This function is called by the frontend with backend signature
+     *
+     */
+    function linkUsername(
+        string calldata username,
+        string calldata xUserId,
+        bytes32 nonce,
+        uint256 expiry,
+        bytes calldata backendSig
+    ) external nonReentrant {
+        if (bytes(username).length == 0) revert XWalletRegistry__EmptyUsername();
+        if (bytes(xUserId).length == 0) revert XWalletRegistry__EmptyUserId();
+        if (block.timestamp > expiry) revert XWalletRegistry__LinkExpired();
+        if (usedNonces[nonce]) revert XWalletRegistry__NonceUsed();
+    }
+
     // ERRORS //
     error XWalletRegistry__NullAddress();
 }
