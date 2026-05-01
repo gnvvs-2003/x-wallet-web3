@@ -154,6 +154,19 @@ contract XWalletRegistry is Ownable, ReentrancyGuard {
         return string(bLower);
     }
 
+    // ADMIN FUNCTIONS - UPDATE BACKEND SIGNER //
+    /**
+     * @notice Updates the backend signer address
+     * @dev Only the owner can call this function
+     * @param newSigner The new backend signer address
+     */
+    function updateBackendSigner(address newSigner) external onlyOwner {
+        if (newSigner == address(0)) revert XWalletRegistry__NullAddress();
+        address oldSigner = backendSigner;
+        backendSigner = newSigner;
+        emit BackendSignerUpdated(oldSigner, newSigner);
+    }
+
     // ERRORS //
     error XWalletRegistry__NullAddress();
     error XWalletRegistry__UserNotLinked();
