@@ -21,7 +21,9 @@ contract XWalletRegistry is Ownable, ReentrancyGuard {
     using ECDSA for bytes32; // signature verification
     using MessageHashUtils for bytes32; // message hashing
 
-    // STATE VARIABLES //
+    // ══════════════════════════════════════════════════════
+    //                       STATE VARIABLES
+    // ══════════════════════════════════════════════════════
 
     /// @dev The backendSigner address that is authorized to approve links between x and wallet This will be hold by backend
     address public backendSigner;
@@ -36,13 +38,17 @@ contract XWalletRegistry is Ownable, ReentrancyGuard {
     /// @notice using nonce
     mapping(bytes32 => bool) public usedNonces;
 
-    // EVENTS //
+    // ══════════════════════════════════════════════════════
+    //                           EVENTS
+    // ══════════════════════════════════════════════════════
 
     event UsernameLinked(address indexed wallet, string username, uint256 timestamp);
     event UsernameUnlinked(address indexed wallet, string username, uint256 timestamp);
     event BackendSignerUpdated(address oldSigner, address newSigner);
 
-    // CONSTRUCTOR //
+    // ══════════════════════════════════════════════════════
+    //                         CONSTRUCTOR
+    // ══════════════════════════════════════════════════════
 
     /**
      * @param _backendSigner address used by the server to sign link aprovals
@@ -52,7 +58,9 @@ contract XWalletRegistry is Ownable, ReentrancyGuard {
         backendSigner = _backendSigner;
     }
 
-    // MAIN FUNCTIONS //
+    // ══════════════════════════════════════════════════════
+    //                      MAIN FUNCTIONS
+    // ══════════════════════════════════════════════════════
 
     /**
      * @notice Links an X username to a wallet address
@@ -134,6 +142,10 @@ contract XWalletRegistry is Ownable, ReentrancyGuard {
         emit UsernameUnlinked(msg.sender, username, block.timestamp);
     }
 
+    // ══════════════════════════════════════════════════════
+    //                      VIEW FUNCTIONS
+    // ══════════════════════════════════════════════════════
+
     /**
      * @notice Gets the wallet address linked to an X username
      * @param username The X username to look up
@@ -161,6 +173,10 @@ contract XWalletRegistry is Ownable, ReentrancyGuard {
         return isVerified[wallet];
     }
 
+    // ══════════════════════════════════════════════════════
+    //                       PURE FUNCTIONS
+    // ══════════════════════════════════════════════════════
+
     /**
      * @dev Builds the message hash to be signed by backend server
      * @param wallet The wallet address
@@ -183,7 +199,10 @@ contract XWalletRegistry is Ownable, ReentrancyGuard {
         );
     }
 
-    // INTERNAL FUNCTIONS - UTILS //
+    // ══════════════════════════════════════════════════════
+    //                       INTERNAL FUNCTIONS
+    // ══════════════════════════════════════════════════════
+
     /**
      * @notice Converts a string to lowercase for consistent storage
      * @dev Only handles ASCII characters (sufficient for X usernames)
@@ -203,7 +222,10 @@ contract XWalletRegistry is Ownable, ReentrancyGuard {
         return string(bLower);
     }
 
-    // ADMIN FUNCTIONS - UPDATE BACKEND SIGNER //
+    // ══════════════════════════════════════════════════════
+    //                        ADMIN FUNCTIONS
+    // ══════════════════════════════════════════════════════
+
     /**
      * @notice Updates the backend signer address
      * @dev Only the owner can call this function
@@ -216,7 +238,9 @@ contract XWalletRegistry is Ownable, ReentrancyGuard {
         emit BackendSignerUpdated(oldSigner, newSigner);
     }
 
-    // ERRORS //
+    // ══════════════════════════════════════════════════════
+    //                       ERRORS
+    // ══════════════════════════════════════════════════════
     error XWalletRegistry__NullAddress();
     error XWalletRegistry__UserNotLinked();
     error XWalletRegistry__EmptyUsername();
