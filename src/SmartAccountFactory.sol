@@ -28,6 +28,7 @@ contract SmartAccountFactory {
     //                    CONSTRUCTOR
     // ══════════════════════════════════════════════════════
     constructor(IEntryPoint _entryPoint) {
+        /// @dev Initializes SmartAccount
         accountImplementation = new SmartAccount(_entryPoint);
     }
     // ══════════════════════════════════════════════════════
