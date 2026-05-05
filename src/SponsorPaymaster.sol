@@ -26,7 +26,7 @@ import {XWalletRegistry} from "./XWalletRegistry.sol";
  * - Nonce protection enabled
  */
 
-contract SponserPaymaster is BasePaymaster {
+contract SponsorPaymaster is BasePaymaster {
     using UserOperationLib for PackedUserOperation;
     using ECDSA for bytes32; // signature verification
     using MessageHashUtils for bytes32; // message hashing
