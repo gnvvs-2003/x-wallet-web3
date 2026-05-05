@@ -111,7 +111,7 @@ contract SponserPaymaster is BasePaymaster {
      *             bytes signature;
      *         }
      *     ```
-     * - verify paymaster counter signature
+     * - verify paymaster counter signature i.e backend signature
      * - checks the user x-verified or not
      * - check gas limit
      * - returns context for postOp to track spending
@@ -143,7 +143,7 @@ contract SponserPaymaster is BasePaymaster {
         if (block.timestamp > expiry) {
             revert SponserPaymaster__PaymasterSignatureExpired();
         }
-        /// @custom:verification Paymaster signature Verification using message hash to generate paymaster address
+        /// @custom:verification Recreate the hash and verify the paymaster backend signature
         bytes32 messageHash = keccak256(abi.encodePacked("PAYMASTER_APPROVAL:", userOpHash, pmNonce, expiry));
         bytes32 ethSignedHash = messageHash.toEthSignedMessageHash(); // converts to standard ETH signed msg
         address recoveredAddr = ethSignedHash.recover(pmSignature);

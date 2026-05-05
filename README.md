@@ -77,3 +77,5 @@ function _postOp(PostOpMode mode, bytes calldata context, uint256 actualGasCost,
     totalSponsoredForUser[smartAccount] += actualGasCost;
 }
 ```
+
+# Contract workflow

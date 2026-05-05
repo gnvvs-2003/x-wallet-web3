@@ -63,7 +63,8 @@ contract SmartAccountFactory {
         if (codeSize > 0) {
             return SmartAccount(payable(addr));
         }
-        /// @notice Create a new account
+        /// @notice If no account exists => create a proxy account usnig CREATE2 instead of deploying the full contract
+        /// @notice Proxy := ERC1967Proxy
         account = SmartAccount(
             // EntryPoint
             payable(new ERC1967Proxy{salt: bytes32(salt)}(
