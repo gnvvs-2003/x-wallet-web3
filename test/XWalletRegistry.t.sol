@@ -95,39 +95,30 @@ contract XWalletRegistryTest is Test {
         // Should be stored as lowercase
         assertEq(registry.walletToUsername(userAlice), "alice_eth", "Should store username as lowercase");
     }
+
     // ══════════════════════════════════════════════════════
     //         LINK USERNAME - SIGNATURE TESTS
     // ══════════════════════════════════════════════════════
     function test_linkusername_revertOnExpiredSignature() public {
         bytes32 nonce = keccak256("test-nonce-expired");
         uint256 expiry = block.timestamp - 1; // Already expired
-        bytes memory signature = _createBackendSignature(
-            userAlice, ALICE_USERNAME, ALICE_X_ID, nonce, expiry
-        );
+        bytes memory signature = _createBackendSignature(userAlice, ALICE_USERNAME, ALICE_X_ID, nonce, expiry);
         vm.prank(userAlice);
         vm.expectRevert(XWalletRegistry.XWalletRegistry__LinkExpired.selector);
         registry.linkUsername(ALICE_USERNAME, ALICE_X_ID, nonce, expiry, signature);
     }
-    function test_linkusername_revertsOnInvalidSignature() public{
+
+    function test_linkusername_revertsOnInvalidSignature() public {
         bytes32 nonce = keccak256("test-nonce-invalid");
         uint256 expiry = block.timestamp + 15 minutes; // Valid expiry
         // Creating a wrong key to generate a invalid signature
         uint256 wrongKey = 0xAB1242;
-        bytes32 messageHash = keccak256(abi.encodePacked(
-            "LINK_X_WALLET",
-            userAlice,
-            ":",
-            ALICE_USERNAME,
-            ":",
-            ALICE_X_ID,
-            ":",
-            nonce,
-            ":",
-            expiry
-        ));
+        bytes32 messageHash = keccak256(
+            abi.encodePacked("LINK_X_WALLET", userAlice, ":", ALICE_USERNAME, ":", ALICE_X_ID, ":", nonce, ":", expiry)
+        );
         bytes32 ethHash = MessageHashUtils.toEthSignedMessageHash(messageHash);
-        (uint8 v,bytes32 r,bytes32 s) = vm.sign(wrongKey,ethHash);
-        bytes memory invalidSignature = abi.encodePacked(r,s,v);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(wrongKey, ethHash);
+        bytes memory invalidSignature = abi.encodePacked(r, s, v);
         vm.prank(userAlice);
         vm.expectRevert(XWalletRegistry.XWalletRegistry__InvalidSignature.selector);
         registry.linkUsername(ALICE_USERNAME, ALICE_X_ID, nonce, expiry, invalidSignature);
@@ -139,9 +130,7 @@ contract XWalletRegistryTest is Test {
     function test_linkUsername_revertsOnReusedNonce() public {
         bytes32 nonce = keccak256("test-nonce-reuse");
         uint256 expiry = block.timestamp + 15 minutes;
-        bytes memory signature = _createBackendSignature(
-            userAlice, ALICE_USERNAME, ALICE_X_ID, nonce, expiry
-        );
+        bytes memory signature = _createBackendSignature(userAlice, ALICE_USERNAME, ALICE_X_ID, nonce, expiry);
         // First link — should succeed
         vm.prank(userAlice);
         registry.linkUsername(ALICE_USERNAME, ALICE_X_ID, nonce, expiry, signature);
@@ -154,7 +143,79 @@ contract XWalletRegistryTest is Test {
         registry.linkUsername(ALICE_USERNAME, ALICE_X_ID, nonce, expiry, signature);
     }
 
+    // ══════════════════════════════════════════════════════
+    //         LINK USERNAME - DUPLICATES
+    // ══════════════════════════════════════════════════════
+    function test_linkusername_revertsIfUsernameAlreadyTaken() public {
+        // Alice links first
+        bytes32 nonceA = keccak256("nonce-a");
+        uint256 expiry = block.timestamp + 15 minutes;
+        bytes memory sigA = _createBackendSignature(userAlice, ALICE_USERNAME, ALICE_X_ID, nonceA, expiry);
+        vm.prank(userAlice);
+        registry.linkUsername(ALICE_USERNAME, ALICE_X_ID, nonceA, expiry, sigA);
 
+        // Bob tries to link the same username
+        bytes32 nonceB = keccak256("nonce-b");
+        bytes memory sigB = _createBackendSignature(userBob, ALICE_USERNAME, BOB_X_ID, nonceB, expiry);
+        vm.prank(userBob);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                XWalletRegistry.XWalletRegistry__UsernameAlreadyLinked.selector, ALICE_USERNAME, userAlice
+            )
+        );
+        registry.linkUsername(ALICE_USERNAME, BOB_X_ID, nonceB, expiry, sigB);
+    }
+
+    // ══════════════════════════════════════════════════════
+    //               UNLINK USERNAME TESTS
+    // ══════════════════════════════════════════════════════
+    function test_unlinkusername_success() public {
+        // First link
+        bytes32 nonce = keccak256("unlink-nonce");
+        uint256 expiry = block.timestamp + 15 minutes;
+        bytes memory signature = _createBackendSignature(userAlice, ALICE_USERNAME, ALICE_X_ID, nonce, expiry);
+        vm.prank(userAlice);
+        registry.linkUsername(ALICE_USERNAME, ALICE_X_ID, nonce, expiry, signature);
+        // Then unlink
+        vm.prank(userAlice);
+        registry.unlinkUsername();
+        // Verify cleanup
+        assertEq(registry.usernameToWallet("alice_eth"), address(0));
+        assertEq(registry.walletToUsername(userAlice), "");
+        assertFalse(registry.isVerified(userAlice));
+    }
+
+    function test_unlinkusername_revertsIfNotLinked() public {
+        vm.prank(userAlice);
+        vm.expectRevert(XWalletRegistry.XWalletRegistry__UserNotLinked.selector);
+        registry.unlinkUsername();
+    }
+
+    // ══════════════════════════════════════════════════════
+    //         ADMIN FUNCTIONS TESTS
+    // ══════════════════════════════════════════════════════
+    function test_updateBackendSigner_onlyOwner() public {
+        /// @dev The deployer is set as owner in  setUp
+        address newSigner = makeAddr("newSigner");
+        vm.prank(attacker);
+        vm.expectRevert();
+        registry.updateBackendSigner(newSigner);
+        vm.prank(deployer);
+        registry.updateBackendSigner(newSigner);
+        assertEq(registry.backendSigner(), newSigner);
+    }
+
+    // ══════════════════════════════════════════════════════
+    //                       FUZZ TESTS
+    // ══════════════════════════════════════════════════════
+    function test_linkusername_fuzz_validParamsAlwaysSucceed(uint256 nonceRand, uint256 expiryOffset) public {
+        uint256 expiry = block.timestamp + bound(expiryOffset, 60, 86400);
+        bytes32 nonce = keccak256(abi.encodePacked(nonceRand));
+        bytes memory signature = _createBackendSignature(userAlice, ALICE_USERNAME, ALICE_X_ID, nonce, expiry);
+        vm.prank(userAlice);
+        registry.linkUsername(ALICE_USERNAME, ALICE_X_ID, nonce, expiry, signature);
+        assertTrue(registry.isVerified(userAlice));
+    }
 
     // ══════════════════════════════════════════════════════
     //         HELPER - BACKEND SIGNATURE CREATION
