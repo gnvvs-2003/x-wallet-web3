@@ -99,12 +99,12 @@ contract XWalletRegistry is Ownable, ReentrancyGuard {
             revert XWalletRegistry__WalletAlreadyLinked(msg.sender, existingUsernameForWallet);
         }
         /// @dev Backend signature verification
-        /// @custom:process Backend signature verification process 
+        /// @custom:process Backend signature verification process
         /// - 1. construct the message hash with user details(msg.sender,username,userid,nonce,expiry)
         /// - 2. Convert to ethereum standard message hash
         /// - 3. recover the signer from the signature
         /// - 4. verify the signer i.e recovered signer == backendSigner
-        
+
         /// @dev Message hash reconstruct
         bytes32 messageHash = keccak256(
             abi.encodePacked(

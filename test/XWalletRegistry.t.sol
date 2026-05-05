@@ -2,3 +2,119 @@
 pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
+import {console} from "forge-std/console.sol";
+import {XWalletRegistry} from "../src/XWalletRegistry.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+
+/**
+ * @author gnvvs-2003
+ * @title XWalletRegistryTest
+ * @dev Test code for XWalletRegistry contract
+ */
+
+contract XWalletRegistryTest is Test {
+    // ══════════════════════════════════════════════════════
+    //                    STATE VARIABLES
+    // ══════════════════════════════════════════════════════
+    XWalletRegistry public registry;
+    // ══════════════════════════════════════════════════════
+    //                    TEST ACCOUNTS
+    // ══════════════════════════════════════════════════════
+    address public deployer = makeAddr("deployer");
+    address public backendAdddr = makeAddr("backend");
+    address public userAlice = makeAddr("alice");
+    address public userBob = makeAddr("bob");
+    address public attacker = makeAddr("attacker");
+    // ══════════════════════════════════════════════════════
+    //                    SIGNING KEYS
+    // ══════════════════════════════════════════════════════
+    uint256 public backendPrivateKey;
+    address public backendSigner;
+    // ══════════════════════════════════════════════════════
+    //                       TEST DATA
+    // ══════════════════════════════════════════════════════
+    string constant ALICE_USERNAME = "alice_eth";
+    string constant ALICE_X_ID = "123456789";
+    string constant BOB_USERNAME = "bob_eth";
+    string constant BOB_X_ID = "987654321";
+
+    // ══════════════════════════════════════════════════════
+    //                         SETUP
+    // ══════════════════════════════════════════════════════
+    function setUp() public {
+        /// @dev backendSigner and backendPrivate key
+        backendPrivateKey = 0xABCDEF132;
+        backendSigner = vm.addr(backendPrivateKey);
+        vm.prank(deployer);
+        /// @notice Deploy XWalletRegistry contract with deployer (sets owner of registry as deployer)
+        registry = new XWalletRegistry(backendSigner);
+    }
+
+    // ══════════════════════════════════════════════════════
+    //                     DEPLOYED TESTS
+    // ══════════════════════════════════════════════════════
+    function test_deployment_address_is_backendSigner() public view {
+        assertEq(registry.backendSigner(), backendSigner);
+    }
+
+    function test_deployment_sets_ownerAs_deployer() public view {
+        assertEq(registry.owner(), deployer);
+    }
+
+    // ══════════════════════════════════════════════════════
+    //                     LINK USERNAME TESTS
+    // ══════════════════════════════════════════════════════
+    function test_linkusername_success() public {
+        bytes32 nonce = keccak256("test-nonce-1");
+        uint256 expiry = block.timestamp + 15 minutes;
+        bytes memory signature = _createBackendSignature(userAlice, ALICE_USERNAME, ALICE_X_ID, nonce, expiry);
+        vm.prank(userAlice);
+        registry.linkUsername(ALICE_USERNAME, ALICE_X_ID, nonce, expiry, signature);
+        assertEq(registry.usernameToWallet("alice_eth"), userAlice);
+        assertEq(registry.walletToUsername(userAlice), "alice_eth");
+        assertEq(registry.isVerified(userAlice), true);
+    }
+
+    function test_linkusername_emitsEvent() public {
+        bytes32 nonce = keccak256("test-nonce-2");
+        uint256 expiry = block.timestamp + 15 minutes;
+        bytes memory signature = _createBackendSignature(userAlice, ALICE_USERNAME, ALICE_X_ID, nonce, expiry);
+        vm.expectEmit(true, false, false, false);
+        emit XWalletRegistry.UsernameLinked(userAlice, "alice_eth", block.timestamp);
+        vm.prank(userAlice);
+        registry.linkUsername(ALICE_USERNAME, ALICE_X_ID, nonce, expiry, signature);
+    }
+
+    function test_linkUsername_caseInsensitive() public {
+        // Link with mixed case username
+        bytes32 nonce = keccak256("test-nonce-case");
+        uint256 expiry = block.timestamp + 15 minutes;
+        bytes memory signature = _createBackendSignature(userAlice, "Alice_ETH", ALICE_X_ID, nonce, expiry);
+        vm.prank(userAlice);
+        registry.linkUsername("Alice_ETH", ALICE_X_ID, nonce, expiry, signature);
+        // Should be stored as lowercase
+        assertEq(registry.walletToUsername(userAlice), "alice_eth", "Should store username as lowercase");
+    }
+
+    // ══════════════════════════════════════════════════════
+    //         HELPER - BACKEND SIGNATURE CREATION
+    // ══════════════════════════════════════════════════════
+    function _createBackendSignature(
+        address wallet,
+        string memory username,
+        string memory userId,
+        bytes32 nonce,
+        uint256 expiry
+    ) internal returns (bytes memory) {
+        /// @custom:process
+        /// 1. Build message hash
+        bytes32 messageHash =
+            keccak256(abi.encodePacked("LINK_X_WALLET", wallet, ":", username, ":", userId, ":", nonce, ":", expiry));
+        /// 2. Apply ETH standard
+        bytes32 ethSignedHash = MessageHashUtils.toEthSignedMessageHash(messageHash);
+        /// 3. Sign with backend private key
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(backendPrivateKey, ethSignedHash);
+        /// 4. returns the signature in encoded format
+        return abi.encodePacked(r, s, v);
+    }
+}
