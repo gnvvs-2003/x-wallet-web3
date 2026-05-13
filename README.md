@@ -1,81 +1,115 @@
-# Architecture:
+# 𝕏-Wallet Web3: Social Identity meets Account Abstraction
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Foundry](https://img.shields.io/badge/Built%20with-Foundry-FFDB1C.svg)](https://book.getfoundry.sh/)
+[![ERC-4337](https://img.shields.io/badge/Protocol-ERC--4337-blue.svg)](https://eips.ethereum.org/EIPS/eip-4337)
+
+**X-Wallet** is a next-generation Web3 wallet system designed to bridge the gap between Social Media Identity and Blockchain Security. By leveraging **Account Abstraction (ERC-4337)**, it provides a seamless, gasless, and human-readable experience for everyday users.
+
+---
+
+## 🚀 Key Features
+
+*   **🔗 Identity Linking**: Link your **X (Twitter) username** to your Ethereum address on-chain via the `XWalletRegistry`. This makes your wallet human-readable and verified.
+*   **⛽ Gasless Transactions**: Send transactions (tokens, contract calls) **without holding any ETH**. A `SponsorPaymaster` contract handles the gas fees for you.
+*   **📱 Web2-Style Experience**: Authenticate using official **X OAuth 2.0**. No complex private keys or seed phrases needed for identity verification.
+*   **🛡️ Institutional Security**: Smart accounts are controlled by your EOA but execute through the highly secure ERC-4337 EntryPoint protocol.
+
+---
+
+## 🏗️ Architecture
+
 ![Architecture](image.png)
 
-# Workflow and code integration
-1. User Identity Linking `XWalletRegistry.sol` contract
+The system consists of three main layers:
+1.  **Smart Contracts (Solidity)**: The core logic for identity, account management, and gas sponsorship.
+2.  **Backend (Node.js)**: Orchestrates X OAuth verification and signs gas sponsorships.
+3.  **Frontend (React/Vite)**: A premium, glassmorphism-inspired dashboard for users.
+
+---
+
+## 🛠️ Technology Stack
+
+| Component | Technology |
+| :--- | :--- |
+| **Smart Contracts** | Solidity, Foundry, OpenZeppelin |
+| **Backend** | Node.js, Express, Ethers.js (v6), JWT |
+| **Frontend** | React, Vite, Tailwind CSS, Lucide Icons |
+| **Identity** | X (Twitter) OAuth 2.0 PKCE |
+| **Protocol** | ERC-4337 (Account Abstraction) |
+
+---
+
+## 📂 Project Structure
+
+```text
+x-wallet-web3/
+├── src/                # Solidity Smart Contracts
+│   ├── XWalletRegistry.sol     # User-Identity mapping
+│   ├── SmartAccount.sol        # User's contract wallet
+│   ├── SmartAccountFactory.sol # CREATE2 account deployment
+│   └── SponsorPaymaster.sol    # Gas sponsorship logic
+├── backend/            # Express Server (Auth & Bundling)
+├── frontend/           # React Application (Dashboard)
+├── script/             # Deployment & Interaction Scripts
+└── test/               # Foundry Unit & Integration Tests
+```
+
+---
+
+## 🚦 Getting Started
+
+### 1. Smart Contracts
+```bash
+# Install dependencies
+forge install
+
+# Build & Test
+forge build
+forge test
+```
+
+### 2. Backend Setup
+```bash
+cd backend
+npm install
+npm run dev
+```
+
+### 3. Frontend Setup
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+---
+
+## 📜 Core Workflow
+
+### 1. Identity Linking
+The `XWalletRegistry` verifies backend signatures to establish a permanent on-chain link between a wallet and an X handle.
+
 ```solidity
-function linkUsername(
-    string calldata username,
-    string calldata xUserId,
-    bytes32 nonce,
-    uint256 expiry,
-    bytes calldata backendSig
-) external nonReentrant {
-    // 1. Recreate the message the backend signed
-    bytes32 messageHash = keccak256(abi.encodePacked("LINK_X_WALLET:", msg.sender, ":", username, ":", xUserId, ":", nonce, ":", expiry));
-    
-    // 2. Recover the signer from the signature
-    address recoveredSigner = messageHash.toEthSignedMessageHash().recover(backendSig);
-    
-    // 3. Verify it's the authorized backend
-    if (recoveredSigner != backendSigner) revert InvalidSignature();
-    
-    // 4. Record the link on-chain
-    usernameToWallet[lowerUsername] = msg.sender;
-    isVerified[msg.sender] = true;
+function linkUsername(string calldata username, string calldata xUserId, bytes32 nonce, uint256 expiry, bytes calldata backendSig) external {
+    // Verifies backend signature and stores mapping
 }
 ```
 
-2. Requesting Gas Sponsorship (*Off-chain*)
-When the user wants to execute a transaction, they create a `UserOperation` and send it to the backend server instead of directly to the network. The backend checks:
-
-- Is this wallet verified in the `XWalletRegistry`?
-- Has the user exceeded their daily sponsorship limit?
-- Is the destination safe?
-If everything is valid, the backend creates a signature over the `UserOperation` hash and returns it.
-
-3. Paymaster Validation via `SponserPaymaster.sol` contract
+### 2. Gas Sponsorship
+The `SponsorPaymaster` validates that the user is verified on X before agreeing to pay for their transaction gas.
 
 ```solidity
 function _validatePaymasterUserOp(PackedUserOperation calldata userOp, bytes32 userOpHash, uint256 maxCost) internal override returns (bytes memory context, uint256 validationData) {
-    // 1. Extract the paymaster signature from the UserOperation
-    bytes calldata paymasterData = userOp.paymasterAndData[20:];
-    (bytes32 pmNonce, uint256 expiry, bytes memory pmSignature) = abi.decode(paymasterData, (bytes32, uint256, bytes));
-    
-    // 2. Recreate the message and recover the signer
-    bytes32 messageHash = keccak256(abi.encodePacked("PAYMASTER_APPROVAL:", userOpHash, pmNonce, expiry));
-    address recoveredAddr = messageHash.toEthSignedMessageHash().recover(pmSignature);
-    
-    // 3. Check that the backend actually signed off on sponsoring THIS specific UserOp
-    if (recoveredAddr != paymasterSigner) {
-        revert SponserPaymaster__InvalidSignature();
-    }
-    
-    // 4. Ensure we don't sponsor more than allowed
-    uint256 newTotal = totalSponsoredForUser[userOp.sender] + maxCost;
-    if (newTotal > maxSponsorshipPerUser) {
-        revert SponserPaymaster__ExceedsUserSponsorLimit(userOp.sender, newTotal, maxSponsorshipPerUser);
-    }
-    
-    // Return the context to be used in _postOp for updating limits
-    context = abi.encode(userOp.sender, pmNonce, maxCost);
-    return (context, 0);
+    // Recovers backend signature and checks user limits
 }
 ```
 
-4. Post operation : Tracking gas usage
-Once the transaction is executed by the Smart Account, the EntryPoint calls the Paymaster back to finalize accounting.
+---
 
-```solidity
-function _postOp(PostOpMode mode, bytes calldata context, uint256 actualGasCost, uint256 actualUserOpFeePerGas) internal override {
-    (address smartAccount, bytes32 pmNonce, ) = abi.decode(context, (address, bytes32, uint256));
-    
-    // Prevent the same signature from being used again (replay protection)
-    usedPaymasterNonces[pmNonce] = true;
-    
-    // Add the actual gas used to the user's running total
-    totalSponsoredForUser[smartAccount] += actualGasCost;
-}
-```
+## 📄 License
+This project is licensed under the **MIT License**.
 
-# Contract workflow
+---
+
+Developed with ❤️ by the X-Wallet Team.

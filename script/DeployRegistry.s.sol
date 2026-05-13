@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Script} from "forge-std/Script.sol";
 import {XWalletRegistry} from "../src/XWalletRegistry.sol";
-import {console2} from "forge-std/console2.log";
+import {console} from "forge-std/console.sol";
 
 /**
  * @author gnvvs-2003
@@ -19,7 +19,7 @@ contract DeployRegistry is Script {
         address backendSigner = vm.envAddress("BACKEND_SIGNER_ADDRESS");
         address deployer = vm.addr(deployerPrivateKey);
         vm.startBroadcast(deployerPrivateKey);
-        console2.log("Deploying Registry!!!");
+        console.log("Deploying Registry!!!");
         XWalletRegistry registry = new XWalletRegistry(backendSigner);
         vm.stopBroadcast();
         string memory deploymentInfo = string(abi.encodePacked("REGISTRY_ADDRESS=", vm.toString(address(registry))));

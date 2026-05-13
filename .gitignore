@@ -12,4 +12,7 @@ docs/
 
 # Dotenv file
 .env
+.env.local
 web3-guide.md
+deployments
+testDeploymentScript.bash

@@ -40,7 +40,7 @@ contract SmartAccount is IAccount, Initializable, UUPSUpgradeable, ReentrancyGua
     /// @notice ERC-4337 EntryPoint contract
     IEntryPoint public immutable I_ENTRYPOINT;
     /// @notice XWalletRegistry contract
-    XWalletRegistry public I_X_WALLET_REGISTRY;
+    XWalletRegistry public i_xWalletRegistry;
     /// @notice Owner of the smart account : EOA
     address public owner;
     /// @notice Whether X verification is required for all transactions
@@ -66,13 +66,21 @@ contract SmartAccount is IAccount, Initializable, UUPSUpgradeable, ReentrancyGua
     // ══════════════════════════════════════════════════════
 
     modifier onlyEntryPoint() {
-        if (msg.sender != address(I_ENTRYPOINT)) revert SmartAccount__NotEntryPoint();
+        _onlyEntryPoint();
         _;
     }
 
+    function _onlyEntryPoint() internal view {
+        if (msg.sender != address(I_ENTRYPOINT)) revert SmartAccount__NotEntryPoint();
+    }
+
     modifier onlyEntryPointOrOwner() {
-        if (msg.sender != address(I_ENTRYPOINT) && msg.sender != owner) revert SmartAccount__NotEntryPointOrOwner();
+        _onlyEntryPointOrOwner();
         _;
+    }
+
+    function _onlyEntryPointOrOwner() internal view {
+        if (msg.sender != address(I_ENTRYPOINT) && msg.sender != owner) revert SmartAccount__NotEntryPointOrOwner();
     }
 
     // ══════════════════════════════════════════════════════
@@ -98,7 +106,7 @@ contract SmartAccount is IAccount, Initializable, UUPSUpgradeable, ReentrancyGua
         if (_registry == address(0)) revert SmartAccount__NullAddress();
         owner = _owner;
         requireXVerification = _requireVerification;
-        I_X_WALLET_REGISTRY = XWalletRegistry(_registry);
+        i_xWalletRegistry = XWalletRegistry(_registry);
     }
 
     // ══════════════════════════════════════════════════════
@@ -123,7 +131,7 @@ contract SmartAccount is IAccount, Initializable, UUPSUpgradeable, ReentrancyGua
         /// @dev Signature validation
         validationData = _validateSignature(userOp, userOpHash);
         /// @dev X Verification
-        if (requireXVerification && !I_X_WALLET_REGISTRY.isVerified(owner)) {
+        if (requireXVerification && !i_xWalletRegistry.isVerified(owner)) {
             return 1;
         }
         /// @dev EntryPoint pay
@@ -169,7 +177,7 @@ contract SmartAccount is IAccount, Initializable, UUPSUpgradeable, ReentrancyGua
     // ══════════════════════════════════════════════════════
 
     function getLinkedUsername() external view returns (string memory) {
-        return I_X_WALLET_REGISTRY.walletToUsername(owner);
+        return i_xWalletRegistry.walletToUsername(owner);
     }
 
     function getNonce() external view returns (uint256) {
@@ -177,7 +185,7 @@ contract SmartAccount is IAccount, Initializable, UUPSUpgradeable, ReentrancyGua
     }
 
     function hasXVerification() external view returns (bool) {
-        return I_X_WALLET_REGISTRY.isVerified(owner);
+        return i_xWalletRegistry.isVerified(owner);
     }
 
     // ══════════════════════════════════════════════════════

@@ -33,7 +33,7 @@ contract XWalletRegistry is Ownable, ReentrancyGuard {
     /// @dev Mapping of verified status of wallet
     mapping(address => bool) public isVerified;
     /// @dev Timestamp of when link was verified
-    mapping(address => uint256) public verifedAt;
+    mapping(address => uint256) public verifiedAt;
     /// @dev Prevents signature replay attacks
     /// @notice using nonce
     mapping(bytes32 => bool) public usedNonces;
@@ -133,7 +133,7 @@ contract XWalletRegistry is Ownable, ReentrancyGuard {
         usernameToWallet[lowerUsername] = msg.sender;
         walletToUsername[msg.sender] = lowerUsername;
         isVerified[msg.sender] = true;
-        verifedAt[msg.sender] = block.timestamp;
+        verifiedAt[msg.sender] = block.timestamp;
         emit UsernameLinked(msg.sender, lowerUsername, block.timestamp);
     }
 
@@ -144,7 +144,7 @@ contract XWalletRegistry is Ownable, ReentrancyGuard {
         delete usernameToWallet[username];
         delete walletToUsername[msg.sender];
         delete isVerified[msg.sender];
-        delete verifedAt[msg.sender];
+        delete verifiedAt[msg.sender];
         emit UsernameUnlinked(msg.sender, username, block.timestamp);
     }
 

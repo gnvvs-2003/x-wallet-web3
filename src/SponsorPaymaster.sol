@@ -167,6 +167,15 @@ contract SponsorPaymaster is BasePaymaster {
         validationData = 0;
     }
 
+    /**
+     * @notice Override to skip ERC-165 check because EntryPoint v0.6 does not implement it
+     * @param __entryPoint EntryPoint address
+     */
+    function _validateEntryPointInterface(IEntryPoint __entryPoint) internal pure override {
+        // Skip ERC-165 check
+        (address(__entryPoint));
+    }
+
     // ══════════════════════════════════════════════════════
     //                     POST OPERATION
     // ══════════════════════════════════════════════════════

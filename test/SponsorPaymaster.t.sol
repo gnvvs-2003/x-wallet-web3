@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
-import {console} from "forge-std/console.sol";
 import {XWalletRegistry} from "../src/XWalletRegistry.sol";
 import {SponsorPaymaster} from "../src/SponsorPaymaster.sol";
 import {EntryPoint} from "@account-abstraction/core/EntryPoint.sol";

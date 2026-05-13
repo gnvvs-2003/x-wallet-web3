@@ -22,14 +22,14 @@ import {IEntryPoint} from "@account-abstraction/interfaces/IEntryPoint.sol";
  */
 
 contract SmartAccountFactory {
-    SmartAccount public immutable accountImplementation;
+    SmartAccount public immutable ACCOUNT_IMPLEMENTATION;
 
     // ══════════════════════════════════════════════════════
     //                    CONSTRUCTOR
     // ══════════════════════════════════════════════════════
     constructor(IEntryPoint _entryPoint) {
         /// @dev Initializes SmartAccount
-        accountImplementation = new SmartAccount(_entryPoint);
+        ACCOUNT_IMPLEMENTATION = new SmartAccount(_entryPoint);
     }
     // ══════════════════════════════════════════════════════
     //                       EVENTS
@@ -69,7 +69,7 @@ contract SmartAccountFactory {
         account = SmartAccount(
             // EntryPoint
             payable(new ERC1967Proxy{salt: bytes32(salt)}(
-                    address(accountImplementation),
+                    address(ACCOUNT_IMPLEMENTATION),
                     abi.encodeCall(SmartAccount.initialize, (owner, registry, requireXVerification))
                 ))
         );
@@ -88,7 +88,7 @@ contract SmartAccountFactory {
                 abi.encodePacked(
                     type(ERC1967Proxy).creationCode,
                     abi.encode(
-                        address(accountImplementation),
+                        address(ACCOUNT_IMPLEMENTATION),
                         abi.encodeCall(SmartAccount.initialize, (owner, registry, requireXVerification))
                     )
                 )
